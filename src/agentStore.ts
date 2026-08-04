@@ -5,18 +5,18 @@
 
 import { Redis } from "@upstash/redis";
 import type { StudentAgent, StudentAgentFields } from "./types";
+import { resolveRedisCredentials } from "./redisEnv";
 
 let redis: Redis | null | undefined;
 
 function getRedis(): Redis {
   if (redis === undefined) {
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-    redis = url && token ? new Redis({ url, token }) : null;
+    const creds = resolveRedisCredentials();
+    redis = creds ? new Redis(creds) : null;
   }
   if (!redis) {
     throw new Error(
-      "Agent storage isn't configured — set UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN."
+      "Agent storage isn't configured — set UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL / KV_REST_API_TOKEN)."
     );
   }
   return redis;
