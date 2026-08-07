@@ -1,6 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+interface AgentSummary {
+  id: string;
+  studentName: string;
+  updatedAt: number;
+}
+
+interface UserSummary {
+  id: string;
+  email: string;
+  agentId: string;
+}
 
 export default function AdminPage() {
   const [secret, setSecret] = useState("");
@@ -13,6 +25,28 @@ export default function AdminPage() {
   const [inviting, setInviting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [agents, setAgents] = useState<AgentSummary[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetting, setResetting] = useState(false);
+  const [resetResult, setResetResult] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  async function loadData() {
+    const [agentsRes, usersRes] = await Promise.all([
+      fetch("/api/admin/agents").then((r) => r.json()),
+      fetch("/api/admin/users").then((r) => r.json()),
+    ]);
+    if (agentsRes.ok) setAgents(agentsRes.agents);
+    if (usersRes.ok) setUsers(usersRes.users);
+  }
+
+  useEffect(() => {
+    if (unlocked) loadData();
+  }, [unlocked]);
 
   async function unlock() {
     setUnlockError(null);
@@ -49,10 +83,53 @@ export default function AdminPage() {
       setEmail("");
       setStudentName("");
       setNiche("");
+      await loadData();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function resetPassword() {
+    if (!resetEmail.trim()) return;
+    setResetting(true);
+    setResetResult(null);
+    setResetError(null);
+    try {
+      const res = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error);
+      if (data.emailSent) {
+        setResetResult(`Password reset — they'll get an email at ${resetEmail} with the new temporary password.`);
+      } else {
+        setResetResult(
+          `Password reset, but the email didn't send (${data.emailError ?? "no email provider configured"}). ` +
+            `New temporary password: ${data.tempPassword}`
+        );
+      }
+      setResetEmail("");
+    } catch (e) {
+      setResetError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  async function removeAccess(userId: string) {
+    if (!confirm("Revoke this student's login? Their agent, leads, and history stay intact — this only removes their ability to log in.")) {
+      return;
+    }
+    setRemovingId(userId);
+    try {
+      await fetch(`/api/admin/users?userId=${userId}`, { method: "DELETE" });
+      await loadData();
+    } finally {
+      setRemovingId(null);
     }
   }
 
@@ -77,10 +154,12 @@ export default function AdminPage() {
     );
   }
 
+  const agentById = new Map(agents.map((a) => [a.id, a]));
+
   return (
-    <main style={{ maxWidth: 480, margin: "60px auto", padding: 24 }}>
+    <main style={{ maxWidth: 680, margin: "60px auto", padding: 24 }}>
       <h1 style={{ fontSize: 28 }}>Invite a student</h1>
-      <div className="card">
+      <div className="card" style={{ marginBottom: 32 }}>
         <div style={{ display: "grid", gap: 14 }}>
           <div>
             <label>Student name</label>
@@ -100,6 +179,65 @@ export default function AdminPage() {
             {inviting ? "Sending invite…" : "Send invite"}
           </button>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 32 }}>
+        <h2 style={{ marginTop: 0, fontSize: 16 }}>Reset a student&apos;s password</h2>
+        <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          If they lost their temp password before logging in, or just need a fresh one.
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            value={resetEmail}
+            onChange={(e) => setResetEmail(e.target.value)}
+            type="email"
+            placeholder="student@example.com"
+          />
+          <button className="btn-secondary" disabled={resetting || !resetEmail.trim()} onClick={resetPassword}>
+            {resetting ? "Resetting…" : "Reset"}
+          </button>
+        </div>
+        {resetError && <div style={{ color: "#a33", fontSize: 13, marginTop: 8 }}>{resetError}</div>}
+        {resetResult && <div style={{ color: "#1a6e3c", fontSize: 13, marginTop: 8 }}>{resetResult}</div>}
+      </div>
+
+      <h2 style={{ fontSize: 20 }}>Students ({users.length})</h2>
+      <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
+        Opening an agent shows exactly what that student sees on their own account. &quot;Remove access&quot; only
+        revokes their login — their agent, leads, and history stay intact.
+      </p>
+      {users.length === 0 && <p style={{ color: "var(--text-muted)" }}>No students yet.</p>}
+      <div style={{ display: "grid", gap: 10 }}>
+        {users.map((u) => {
+          const agent = agentById.get(u.agentId);
+          return (
+            <div
+              key={u.id}
+              className="card"
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px" }}
+            >
+              <div>
+                <div style={{ fontWeight: 600 }}>{agent?.studentName ?? "(agent not found)"}</div>
+                <div style={{ color: "var(--text-muted)", fontSize: 13 }}>{u.email}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <a href={`/agent/${u.agentId}/email`}>
+                  <button className="btn-secondary" style={{ fontSize: 13, padding: "8px 14px" }}>
+                    Open
+                  </button>
+                </a>
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 13, padding: "8px 14px", color: "#a33" }}
+                  disabled={removingId === u.id}
+                  onClick={() => removeAccess(u.id)}
+                >
+                  {removingId === u.id ? "Removing…" : "Remove access"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </main>
   );
