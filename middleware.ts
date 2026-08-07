@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUserId } from "./src/sessionStore";
+import { getSessionUserId, isAdminSessionValid } from "./src/sessionStore";
 import { getUserById } from "./src/userStore";
 
 // Note: this protects PAGES only. It does not (yet) re-check ownership
@@ -11,6 +11,17 @@ export async function middleware(req: NextRequest) {
   const match = pathname.match(/^\/agent\/([^/]+)/);
   if (!match) return NextResponse.next();
   const agentId = match[1];
+
+  // An admin (unlocked at /admin) can open any student's agent — used for
+  // support/QA, not something a student session can do to another student.
+  const adminToken = req.cookies.get("admin_session")?.value;
+  if (adminToken) {
+    try {
+      if (await isAdminSessionValid(adminToken)) return NextResponse.next();
+    } catch {
+      // fall through to the normal student-session check below
+    }
+  }
 
   const token = req.cookies.get("session")?.value;
   if (!token) {
