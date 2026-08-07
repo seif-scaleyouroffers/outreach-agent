@@ -49,6 +49,11 @@ button {
   padding: 12px 22px;
   font-weight: 600;
   font-size: 15px;
+  transition: opacity 120ms ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
 }
 
 .btn-primary:disabled {
@@ -64,6 +69,11 @@ button {
   padding: 12px 22px;
   font-weight: 600;
   font-size: 15px;
+  transition: background 120ms ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f8f7f4;
 }
 
 .card {
@@ -71,6 +81,13 @@ button {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px;
+  transition: border-color 150ms ease;
+}
+
+/* Only cards that are actually clickable get this — static dashboard tiles
+   stay still so hover doesn't imply an action that isn't there. */
+.card-interactive:hover {
+  border-color: #dcd9d0;
 }
 
 input,
@@ -84,6 +101,20 @@ select {
   width: 100%;
   background: #fff;
   color: var(--text);
+  transition: border-color 120ms ease;
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+  border-color: #dcd9d0;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #c5c2b8;
 }
 
 label {
@@ -100,4 +131,46 @@ label {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+/* Sidebar channel/edit-agent links */
+.nav-link {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text);
+  transition: background 120ms ease;
+}
+
+.nav-link:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.nav-link-active {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+.nav-link-disabled {
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.nav-link-disabled:hover {
+  background: transparent;
+}
+
+/* Leads table rows — barely-there highlight on hover, just enough to track scanning */
+.lead-row {
+  transition: background 120ms ease;
+  border-radius: 8px;
+  padding: 8px;
+  margin: 0 -8px;
+}
+
+.lead-row:hover {
+  background: rgba(0, 0, 0, 0.015);
 }
