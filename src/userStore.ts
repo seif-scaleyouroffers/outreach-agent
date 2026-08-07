@@ -74,3 +74,31 @@ export async function deleteUser(id: string): Promise<boolean> {
   await client.hdel(USER_LIST_INDEX_KEY, id);
   return true;
 }
+
+// Rebuilds the listing index from the actual user:* records in Redis.
+// Needed once, for accounts created before this index existed — their
+// records were always there (login worked fine), they just never got
+// added to this index since it didn't exist yet when they were created.
+// Safe to run anytime; it only ever reconstructs from real records, never
+// invents or removes anything.
+export async function rebuildUserIndex(): Promise<number> {
+  const client = getRedis();
+  let cursor = "0";
+  let count = 0;
+  const entries: Record<string, UserSummary> = {};
+
+  do {
+    const [nextCursor, keys] = await client.scan(cursor, { match: "user:*", count: 100 });
+    cursor = nextCursor;
+    for (const key of keys) {
+      const user = await client.get<StudentUser>(key);
+      if (user) {
+        entries[user.id] = { id: user.id, email: user.email, agentId: user.agentId };
+        count++;
+      }
+    }
+  } while (cursor !== "0");
+
+  if (count > 0) await client.hset(USER_LIST_INDEX_KEY, entries);
+  return count;
+}

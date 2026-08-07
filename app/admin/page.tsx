@@ -29,6 +29,25 @@ export default function AdminPage() {
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [repairMessage, setRepairMessage] = useState<string | null>(null);
+
+  async function repairIndex() {
+    setRepairing(true);
+    setRepairMessage(null);
+    try {
+      const res = await fetch("/api/admin/repair-users-index", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        setRepairMessage(`Found and re-indexed ${data.count} account(s).`);
+        await loadData();
+      } else {
+        setRepairMessage(`Error: ${data.error}`);
+      }
+    } finally {
+      setRepairing(false);
+    }
+  }
 
   const [resetEmail, setResetEmail] = useState("");
   const [resetting, setResetting] = useState(false);
@@ -201,7 +220,13 @@ export default function AdminPage() {
         {resetResult && <div style={{ color: "#1a6e3c", fontSize: 13, marginTop: 8 }}>{resetResult}</div>}
       </div>
 
-      <h2 style={{ fontSize: 20 }}>Students ({users.length})</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <h2 style={{ fontSize: 20 }}>Students ({users.length})</h2>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px" }} disabled={repairing} onClick={repairIndex}>
+          {repairing ? "Checking…" : "Not seeing everyone? Rebuild list"}
+        </button>
+      </div>
+      {repairMessage && <p style={{ fontSize: 13, color: "var(--text-muted)" }}>{repairMessage}</p>}
       <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16 }}>
         Opening an agent shows exactly what that student sees on their own account. &quot;Remove access&quot; only
         revokes their login — their agent, leads, and history stay intact.
