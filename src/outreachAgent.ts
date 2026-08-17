@@ -8,10 +8,8 @@
 //     connection-note structure, WhatsApp's template-vs-freeform-window
 //     split, etc.)
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { Channel, DraftOption, GapAnalysis, LeadInput, OutreachMessage, StudentAgent } from "./types";
-
-const anthropic = new Anthropic();
+import { getLlmProvider } from "./llmProvider";
 
 const CHANNEL_RULES: Record<Channel, string> = {
   email: `EMAIL rules:
@@ -85,17 +83,8 @@ export async function generateDrafts(
   const system = buildSystemPrompt(agent, channel, gapAnalysis, pastMessages);
   const userMessage = `Lead: ${lead.name} at ${lead.company}. Write the two drafts now.`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 1200,
-    system,
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  const provider = await getLlmProvider();
+  const text = await provider.generateText({ system, prompt: userMessage, maxTokens: 1200 });
 
   const cleaned = text.replace(/```json|```/g, "").trim();
   try {
