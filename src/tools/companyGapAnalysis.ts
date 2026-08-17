@@ -8,10 +8,8 @@
 // logins, no paid enrichment APIs. Good enough to inform an outreach angle,
 // not a full audit.
 
-import Anthropic from "@anthropic-ai/sdk";
 import type { LeadInput, GapAnalysis } from "../types";
-
-const anthropic = new Anthropic();
+import { getLlmProvider } from "../llmProvider";
 
 export async function runGapAnalysis(lead: LeadInput): Promise<GapAnalysis> {
   const linksSection = lead.socialLinks
@@ -33,17 +31,8 @@ Produce, in the voice of an operator sizing up where they could help (not a gene
 Respond ONLY with JSON, no markdown fences, no preamble:
 {"summary": "...", "likelyGaps": ["...", "..."], "sources": ["...", "..."]}`;
 
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 1500,
-    messages: [{ role: "user", content: prompt }],
-    tools: [{ type: "web_search_20250305", name: "web_search" } as unknown as Anthropic.Tool],
-  } as Anthropic.MessageCreateParamsNonStreaming);
-
-  const text = response.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
+  const provider = await getLlmProvider();
+  const text = await provider.generateText({ prompt, maxTokens: 1500, useWebSearch: true });
 
   const cleaned = text.replace(/```json|```/g, "").trim();
   try {
